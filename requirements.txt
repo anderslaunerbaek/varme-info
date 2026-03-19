@@ -1,0 +1,5 @@
+python-dotenv
+SQLAlchemy
+psycopg2-binary
+dash
+pandas

@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "varme-info"
+dynamic = ["version", "dependencies"]
+authors = [
+  { name="Anders Launer Bæk-Petersen", email="anders@launer.dk" },
+]
+description = "ECSA 2026 Replication Package"
+readme = {file = "README.md", content-type = "text/markdown"}
+requires-python = ">=3.14"
+classifiers = [
+    "Intended Audience :: Personal use",
+    "Topic :: Software Development :: Build Tools",
+
+    "License :: OSI Approved :: MIT License",
+    
+    "Operating System :: OS Independent",
+
+    "Programming Language :: Python :: 3.14",
+
+]
+license = {file = "LICENSE"}
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+version = {file = ["VERSION"]}
+
+[project.optional-dependencies]
+dev = [
+    "black", 
+    "isort",
+]
+
+test = [
+    "pytest",
+]
+
+
+[project.urls]
+Homepage = "https://github.com/anderslaunerbaek"
+Repository = "https://github.com/anderslaunerbaek/varme-info"
+Issues = "https://github.com/anderslaunerbaek/varme-info/issues"
