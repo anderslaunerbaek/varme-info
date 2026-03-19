@@ -241,22 +241,32 @@ app.layout = html.Div(
     Output("login-error", "children"),
     Input("login-button", "n_clicks"),
     Input("logout-button", "n_clicks"),
+    Input("login-username", "n_submit"),
+    Input("login-password", "n_submit"),
     State("login-username", "value"),
     State("login-password", "value"),
     State("auth-store", "data"),
     prevent_initial_call=True,
 )
-def handle_auth(login_clicks, logout_clicks, username, password, auth_data):
-    ctx = dash.callback_context
-    triggered_id = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
+def handle_auth(
+    login_clicks,
+    logout_clicks,
+    username_submit,
+    password_submit,
+    username,
+    password,
+    auth_data,
+):
+    triggered_id = dash.ctx.triggered_id
 
     if triggered_id == "logout-button":
         return None, ""
 
-    if triggered_id == "login-button":
-
-        is_valid, user = verify_login(engine, username, password)
-
+    if triggered_id in ("login-button", "login-username", "login-password"):
+        if username and password:
+            is_valid, user = verify_login(engine, username, password)
+        else:
+            is_valid = False
         if is_valid:
             return {"authenticated": True, "user_id": user.id}, ""
         return auth_data, "Invalid username or password."

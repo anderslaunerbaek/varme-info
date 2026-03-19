@@ -40,13 +40,13 @@ services:
     env_file: 
       - .env
 
-  dashboard:
-    image: dashboard
-    build:
-      context: .
-    container_name: dashboard
-    environment:
-      - APP_PORT=${APP_PORT}
-    ports:
-    - "${APP_PORT}:${APP_PORT}"
-    restart: unless-stopped
+  # dashboard:
+  #   image: dashboard
+  #   build:
+  #     context: .
+  #   container_name: dashboard
+  #   environment:
+  #     - APP_PORT=${APP_PORT}
+  #   ports:
+  #   - "${APP_PORT}:${APP_PORT}"
+  #   restart: unless-stopped
