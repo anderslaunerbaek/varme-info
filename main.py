@@ -1,106 +1,31 @@
-import random
-import uuid
-from datetime import datetime, timedelta
+import plotly.express as px
+from sqlalchemy import Engine, create_engine
 
 import dash
-import pandas as pd
-import plotly.express as px
 from dash import Input, Output, State, dcc, html
-
 from src import Config
+from src.dash.dummy import build_dataframe, generate_sample_data
+from src.dash.style import (
+    _all_option,
+    _hidden,
+    _login_visible,
+    style_login_fields,
+    style_login_label,
+)
 from src.data import HeatUnit, HeatUnitType, SensorRecord, SensorRecordType
-
-# --- Credentials ---
-VALID_USERNAME = "admin"
-VALID_PASSWORD = "password"
-
-# --- Sample data generation ---
-
-
-def generate_sample_data() -> tuple[list[HeatUnit], list[SensorRecord]]:
-    heat_units = [
-        HeatUnit(name="Unit A", type=HeatUnitType.type1),
-        HeatUnit(name="Unit B", type=HeatUnitType.type1),
-        HeatUnit(name="Unit C", type=HeatUnitType.type2),
-        HeatUnit(name="Unit D", type=HeatUnitType.type2),
-    ]
-
-    records: list[SensorRecord] = []
-    base_time = datetime(2024, 1, 1)
-    rng = random.Random(42)
-
-    for unit in heat_units:
-        for i in range(120):
-            ts = (base_time + timedelta(hours=i * 2)).isoformat()
-            for record_type in SensorRecordType:
-                records.append(
-                    SensorRecord(
-                        type=record_type,
-                        value=round(
-                            rng.gauss(
-                                20 if record_type == SensorRecordType.type1 else 50, 5
-                            ),
-                            2,
-                        ),
-                        heat_unit_id=unit.id,
-                        correlation_id=str(uuid.uuid4()),
-                        time_stamp=ts,
-                    )
-                )
-
-    return heat_units, records
-
-
-def build_dataframe(
-    heat_units: list[HeatUnit], records: list[SensorRecord]
-) -> pd.DataFrame:
-    unit_map = {u.id: u for u in heat_units}
-    rows = []
-    for r in records:
-        unit = unit_map.get(r.heat_unit_id)
-        rows.append(
-            {
-                "time_stamp": r.time_stamp,
-                "value": r.value,
-                "sensor_type": str(r.type),
-                "heat_unit_id": r.heat_unit_id,
-                "heat_unit_name": unit.name if unit else "Unknown",
-                "heat_unit_type": str(unit.type) if unit else "Unknown",
-            }
-        )
-    df = pd.DataFrame(rows)
-    df["time_stamp"] = pd.to_datetime(df["time_stamp"])
-    return df
-
+from src.functions import verify_login
 
 heat_units, sensor_records = generate_sample_data()
 df = build_dataframe(heat_units, sensor_records)
 
 
+config = Config()
+engine: Engine = create_engine(config.database_url)
+
 # --- Dash app ---
 
 app = dash.Dash(__name__, title="Heat Unit Dashboard")
 
-_all_option = {"label": "All", "value": "All"}
-
-_login_visible = {
-    "fontFamily": "sans-serif",
-    "display": "flex",
-    "justifyContent": "center",
-    "alignItems": "center",
-    "minHeight": "100vh",
-    # "backgroundColor": "#f0f2f5",
-}
-_hidden = {"display": "none"}
-
-
-style_login_fields = {
-    "width": "100%",
-    "padding": "0px",
-    "borderRadius": "5px",
-    "border": "1px solid #ccc",
-    "boxSizing": "border-box",
-}
 
 # --- Layout (both sections always in DOM) ---
 
@@ -137,11 +62,7 @@ app.layout = html.Div(
                             [
                                 html.Label(
                                     "Username",
-                                    style={
-                                        "fontWeight": "bold",
-                                        "display": "block",
-                                        "marginBottom": "5px",
-                                    },
+                                    style=style_login_label,
                                 ),
                                 dcc.Input(
                                     id="login-username",
@@ -157,11 +78,7 @@ app.layout = html.Div(
                             [
                                 html.Label(
                                     "Password",
-                                    style={
-                                        "fontWeight": "bold",
-                                        "display": "block",
-                                        "marginBottom": "5px",
-                                    },
+                                    style=style_login_label,
                                 ),
                                 dcc.Input(
                                     id="login-password",
@@ -337,8 +254,11 @@ def handle_auth(login_clicks, logout_clicks, username, password, auth_data):
         return None, ""
 
     if triggered_id == "login-button":
-        if username == VALID_USERNAME and password == VALID_PASSWORD:
-            return {"authenticated": True}, ""
+
+        is_valid, user = verify_login(engine, username, password)
+
+        if is_valid:
+            return {"authenticated": True, "user_id": user.id}, ""
         return auth_data, "Invalid username or password."
 
     return dash.no_update, dash.no_update
@@ -408,5 +328,4 @@ def update_chart(heat_unit_type: str, sensor_type: str, selected_unit_ids: list[
 server = app.server
 
 if __name__ == "__main__":
-    config = Config()
     app.run(debug=config.app_debug, port=config.app_port, host=config.app_host)

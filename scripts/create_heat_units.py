@@ -1,9 +1,4 @@
-import os
-import sys
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
-from sqlalchemy import create_engine
+from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session
 from varmeinfo import Config
 from varmeinfo.data import HeatUnitType
@@ -11,12 +6,6 @@ from varmeinfo.models import Base, HeatUnitModel
 
 config = Config()
 
-DATABASE_URL = (
-    f"postgresql+psycopg2://"
-    f"{config.postgres_user}:{config.postgres_password}"
-    f"@{config.postgres_host}:{config.postgres_port}"
-    f"/{config.postgres_db}"
-)
 
 INITIAL_HEAT_UNITS = [
     HeatUnitModel(name="Boiler North", type=HeatUnitType.type1),
@@ -28,7 +17,7 @@ INITIAL_HEAT_UNITS = [
 
 
 def main() -> None:
-    engine = create_engine(DATABASE_URL)
+    engine = create_engine(config.database_url)
 
     print("Creating tables...")
     Base.metadata.create_all(engine)

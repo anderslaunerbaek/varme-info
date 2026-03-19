@@ -10,6 +10,8 @@ __pycache__/
 data/influxdb
 data/postgres
 
+dev.*
+
 # Distribution / packaging
 .Python
 build/
