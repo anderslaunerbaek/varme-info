@@ -1,5 +1,4 @@
 services:
-
   influxdb:
     image: influxdb:2.7
     container_name: influxdb
@@ -31,4 +30,23 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - ${DATA_DIR}/postgres:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+    env_file: 
+      - .env
+
+  dashboard:
+    image: dashboard
+    build:
+      context: .
+    container_name: dashboard
+    environment:
+      - APP_PORT=${APP_PORT}
+    ports:
+    - "${APP_PORT}:${APP_PORT}"
     restart: unless-stopped

@@ -1,0 +1,11 @@
+scripts
+data
+build
+*.yaml
+README.md
+
+.dockerignore
+.env
+.git*
+.python-version
+*.egg-info

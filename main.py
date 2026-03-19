@@ -5,9 +5,14 @@ from datetime import datetime, timedelta
 import dash
 import pandas as pd
 import plotly.express as px
-from dash import Input, Output, dcc, html
+from dash import Input, Output, State, dcc, html
 
+from src import Config
 from src.data import HeatUnit, HeatUnitType, SensorRecord, SensorRecordType
+
+# --- Credentials ---
+VALID_USERNAME = "admin"
+VALID_PASSWORD = "password"
 
 # --- Sample data generation ---
 
@@ -78,75 +83,276 @@ app = dash.Dash(__name__, title="Heat Unit Dashboard")
 
 _all_option = {"label": "All", "value": "All"}
 
+_login_visible = {
+    "fontFamily": "sans-serif",
+    "display": "flex",
+    "justifyContent": "center",
+    "alignItems": "center",
+    "minHeight": "100vh",
+    # "backgroundColor": "#f0f2f5",
+}
+_hidden = {"display": "none"}
+
+
+style_login_fields = {
+    "width": "100%",
+    "padding": "0px",
+    "borderRadius": "5px",
+    "border": "1px solid #ccc",
+    "boxSizing": "border-box",
+}
+
+# --- Layout (both sections always in DOM) ---
+
 app.layout = html.Div(
-    style={
-        "fontFamily": "sans-serif",
-        "maxWidth": "1200px",
-        "margin": "0 auto",
-        "padding": "20px",
-    },
-    children=[
-        html.H1("Heat Unit Sensor Dashboard"),
+    [
+        dcc.Store(id="auth-store", storage_type="session"),
+        # Login section
         html.Div(
-            style={
-                "display": "grid",
-                "gridTemplateColumns": "1fr 1fr 2fr",
-                "gap": "16px",
-                "marginBottom": "20px",
-            },
+            id="login-section",
+            style=_login_visible,
             children=[
                 html.Div(
-                    [
-                        html.Label("Heat Unit Type", style={"fontWeight": "bold"}),
-                        dcc.Dropdown(
-                            id="heat-unit-type-filter",
-                            options=[_all_option]
-                            + [
-                                {"label": str(t), "value": str(t)} for t in HeatUnitType
-                            ],
-                            value="All",
-                            clearable=False,
+                    style={
+                        "backgroundColor": "white",
+                        "padding": "40px",
+                        "borderRadius": "8px",
+                        "boxShadow": "0 2px 10px rgba(0,0,0,0.1)",
+                        "width": "320px",
+                    },
+                    children=[
+                        html.H2(
+                            "Heat Unit Dashboard",
+                            style={"textAlign": "center", "marginBottom": "8px"},
                         ),
-                    ]
-                ),
-                html.Div(
-                    [
-                        html.Label("Sensor Record Type", style={"fontWeight": "bold"}),
-                        dcc.Dropdown(
-                            id="sensor-type-filter",
-                            options=[_all_option]
-                            + [
-                                {"label": str(t), "value": str(t)}
-                                for t in SensorRecordType
-                            ],
-                            value="All",
-                            clearable=False,
+                        html.P(
+                            "Sign in to continue",
+                            style={
+                                "textAlign": "center",
+                                "color": "#666",
+                                "marginBottom": "24px",
+                            },
                         ),
-                    ]
-                ),
-                html.Div(
-                    [
-                        html.Label("Heat Units", style={"fontWeight": "bold"}),
-                        dcc.Dropdown(
-                            id="heat-unit-filter",
-                            options=[
-                                {"label": u.name, "value": u.id} for u in heat_units
+                        html.Div(
+                            [
+                                html.Label(
+                                    "Username",
+                                    style={
+                                        "fontWeight": "bold",
+                                        "display": "block",
+                                        "marginBottom": "5px",
+                                    },
+                                ),
+                                dcc.Input(
+                                    id="login-username",
+                                    type="text",
+                                    placeholder="Enter username",
+                                    style=style_login_fields,
+                                    n_submit=0,
+                                ),
                             ],
-                            value=[u.id for u in heat_units],
-                            multi=True,
-                            placeholder="Select heat units...",
+                            style={"marginBottom": "16px"},
                         ),
-                    ]
-                ),
+                        html.Div(
+                            [
+                                html.Label(
+                                    "Password",
+                                    style={
+                                        "fontWeight": "bold",
+                                        "display": "block",
+                                        "marginBottom": "5px",
+                                    },
+                                ),
+                                dcc.Input(
+                                    id="login-password",
+                                    type="password",
+                                    placeholder="Enter password",
+                                    style=style_login_fields,
+                                    n_submit=0,
+                                ),
+                            ],
+                            style={"marginBottom": "16px"},
+                        ),
+                        html.Div(
+                            id="login-error",
+                            style={
+                                "color": "red",
+                                "marginBottom": "12px",
+                                "fontSize": "0.9em",
+                            },
+                        ),
+                        html.Button(
+                            "Sign In",
+                            id="login-button",
+                            n_clicks=0,
+                            style={
+                                "width": "100%",
+                                "padding": "10px",
+                                "backgroundColor": "#1a73e8",
+                                "color": "white",
+                                "border": "none",
+                                "borderRadius": "4px",
+                                "cursor": "pointer",
+                                "fontSize": "1em",
+                            },
+                        ),
+                    ],
+                )
             ],
         ),
-        dcc.Graph(id="time-series-chart", style={"height": "500px"}),
+        # Dashboard section
         html.Div(
-            id="record-count",
-            style={"color": "#666", "marginTop": "8px", "fontSize": "0.9em"},
+            id="dashboard-section",
+            style=_hidden,
+            children=[
+                html.Div(
+                    style={
+                        "fontFamily": "sans-serif",
+                        "maxWidth": "1200px",
+                        "margin": "0 auto",
+                        "padding": "20px",
+                    },
+                    children=[
+                        html.Div(
+                            style={
+                                "display": "flex",
+                                "justifyContent": "space-between",
+                                "alignItems": "center",
+                                "marginBottom": "8px",
+                            },
+                            children=[
+                                html.H1(
+                                    "Heat Unit Sensor Dashboard", style={"margin": "0"}
+                                ),
+                                html.Button(
+                                    "Logout",
+                                    id="logout-button",
+                                    n_clicks=0,
+                                    style={
+                                        "padding": "8px 16px",
+                                        "backgroundColor": "#e53935",
+                                        "color": "white",
+                                        "border": "none",
+                                        "borderRadius": "4px",
+                                        "cursor": "pointer",
+                                    },
+                                ),
+                            ],
+                        ),
+                        html.Div(
+                            style={
+                                "display": "grid",
+                                "gridTemplateColumns": "1fr 1fr 2fr",
+                                "gap": "16px",
+                                "marginBottom": "20px",
+                            },
+                            children=[
+                                html.Div(
+                                    [
+                                        html.Label(
+                                            "Heat Unit Type",
+                                            style={"fontWeight": "bold"},
+                                        ),
+                                        dcc.Dropdown(
+                                            id="heat-unit-type-filter",
+                                            options=[_all_option]
+                                            + [
+                                                {"label": str(t), "value": str(t)}
+                                                for t in HeatUnitType
+                                            ],
+                                            value="All",
+                                            clearable=False,
+                                        ),
+                                    ]
+                                ),
+                                html.Div(
+                                    [
+                                        html.Label(
+                                            "Sensor Record Type",
+                                            style={"fontWeight": "bold"},
+                                        ),
+                                        dcc.Dropdown(
+                                            id="sensor-type-filter",
+                                            options=[_all_option]
+                                            + [
+                                                {"label": str(t), "value": str(t)}
+                                                for t in SensorRecordType
+                                            ],
+                                            value="All",
+                                            clearable=False,
+                                        ),
+                                    ]
+                                ),
+                                html.Div(
+                                    [
+                                        html.Label(
+                                            "Heat Units", style={"fontWeight": "bold"}
+                                        ),
+                                        dcc.Dropdown(
+                                            id="heat-unit-filter",
+                                            options=[
+                                                {"label": u.name, "value": u.id}
+                                                for u in heat_units
+                                            ],
+                                            value=[u.id for u in heat_units],
+                                            multi=True,
+                                            placeholder="Select heat units...",
+                                        ),
+                                    ]
+                                ),
+                            ],
+                        ),
+                        dcc.Graph(id="time-series-chart", style={"height": "500px"}),
+                        html.Div(
+                            id="record-count",
+                            style={
+                                "color": "#666",
+                                "marginTop": "8px",
+                                "fontSize": "0.9em",
+                            },
+                        ),
+                    ],
+                )
+            ],
         ),
-    ],
+    ]
 )
+
+
+@app.callback(
+    Output("auth-store", "data"),
+    Output("login-error", "children"),
+    Input("login-button", "n_clicks"),
+    Input("logout-button", "n_clicks"),
+    State("login-username", "value"),
+    State("login-password", "value"),
+    State("auth-store", "data"),
+    prevent_initial_call=True,
+)
+def handle_auth(login_clicks, logout_clicks, username, password, auth_data):
+    ctx = dash.callback_context
+    triggered_id = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
+
+    if triggered_id == "logout-button":
+        return None, ""
+
+    if triggered_id == "login-button":
+        if username == VALID_USERNAME and password == VALID_PASSWORD:
+            return {"authenticated": True}, ""
+        return auth_data, "Invalid username or password."
+
+    return dash.no_update, dash.no_update
+
+
+@app.callback(
+    Output("login-section", "style"),
+    Output("dashboard-section", "style"),
+    Input("auth-store", "data"),
+)
+def toggle_sections(auth_data):
+    if auth_data and auth_data.get("authenticated"):
+        return _hidden, {"display": "block"}
+    return _login_visible, _hidden
 
 
 @app.callback(
@@ -199,5 +405,8 @@ def update_chart(heat_unit_type: str, sensor_type: str, selected_unit_ids: list[
     return fig, count_text
 
 
+server = app.server
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    config = Config()
+    app.run(debug=config.app_debug, port=config.app_port, host=config.app_host)
